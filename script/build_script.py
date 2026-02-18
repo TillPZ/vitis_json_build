@@ -13,12 +13,22 @@ __email__ = "core.dump@segfault.eu"
 
 
 ## helper functions
-from helpers.cli_helpers import get_arguments
+from helpers.cli_helpers import get_arguments, setup_logging
+
+
+import logging
+log = logging.getLogger(__name__)
 
 def main():
-    # 1. get arguments
+
     args = get_arguments()
-    print(args)
+    
+    setup_logging(args.verbose, args.logfile)
+    
+    log.debug("Args: %s", args)
+    log.debug("Logfile: %s", args.logfile)
+    log.info("Config File: %s", args.config)    
+    log.info("Starting build...")
 
     return
 
