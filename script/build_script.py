@@ -233,10 +233,41 @@ def run_build(args):
                         else:
                             log.debug(f"No change in Parameter: {parameter} with: {values} in lib: {lib_name} Domain: {dom_cfg['name']} (standard value)")
                                                          
-                
+    resp = client.list_components()
+    existing_component = [p["name"] for p in resp]
+
+    for app_cfg in cfg.get('apps', []):
+        name = app_cfg.get("name")
+
+        if name in existing_component:
+            log.info(f"Component {app_cfg['name']} already exists. load")
+            app = client.get_component(name)
+        else:
+            log.info(f"Create App: {name}")     
+            platform = app_cfg['platform']
+            platform_path = ( workspace_root / platform / "export" / platform / f"{platform}.xpfm")
+            domain  = app_cfg['domain']
+    
+               
+            kwargs = {
+                "name": name,
+                "platform": str(platform_path),
+                "domain": app_cfg["domain"],
+            }
+
+            if "template" in app_cfg:
+                kwargs["template"] = app_cfg["template"]
+                log.info(f"Using template: {app_cfg['template']}")     
+
+            app = client.create_app_component(**kwargs)
+
+
+
     vitis.dispose()
  
     return
+
+
 
 
 
