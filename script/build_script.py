@@ -22,7 +22,7 @@ from pathlib import Path
 ## helper functions
 from helpers.cli_helpers import get_arguments, setup_logging
 from helpers.workspace import prepare_workspace
-
+from helpers.path_utils import create_link, find_source_files
 
 import logging
 log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def run_build(args):
     log.debug(f"Root of Repository is: %s",  repo_root)
    
     workspace_root = (repo_root / args.workspace).resolve()
-    log.debug(f"Workspace Path is: %s",workspace_root)    
+    log.info(f"Workspace Path is: %s",workspace_root)    
 
 
     config_file_path = (repo_root / args.config).resolve()
@@ -240,7 +240,7 @@ def run_build(args):
         name = app_cfg.get("name")
 
         if name in existing_component:
-            log.info(f"Component {app_cfg['name']} already exists. load")
+            log.info(f"Component {name} already exists. load")
             app = client.get_component(name)
         else:
             log.info(f"Create App: {name}")     
@@ -261,6 +261,24 @@ def run_build(args):
 
             app = client.create_app_component(**kwargs)
 
+        imports = app_cfg.get("imports", [])
+        
+        app_src_path = workspace_root / name / "src"
+
+        log.info(f"App Source path: {app_src_path}...")
+
+        for item in imports:
+            source = item.get("src")
+            destination = item.get("dest")
+            log.info(f"Importing {source} to {destination}...")
+            create_link(source, destination, repo_root, app_src_path)
+
+        found_sources = find_source_files(app_src_path, extensions=None)
+
+        app.set_app_config("USER_COMPILE_SOURCES", found_sources)
+
+
+    
 
 
     vitis.dispose()
