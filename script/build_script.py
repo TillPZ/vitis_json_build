@@ -22,7 +22,7 @@ from pathlib import Path
 ## helper functions
 from helpers.cli_helpers import get_arguments, setup_logging
 from helpers.workspace import prepare_workspace
-
+from helpers.path_utils import create_link, find_source_files
 
 import logging
 log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def run_build(args):
     log.debug(f"Root of Repository is: %s",  repo_root)
    
     workspace_root = (repo_root / args.workspace).resolve()
-    log.debug(f"Workspace Path is: %s",workspace_root)    
+    log.info(f"Workspace Path is: %s",workspace_root)    
 
 
     config_file_path = (repo_root / args.config).resolve()
@@ -233,10 +233,87 @@ def run_build(args):
                         else:
                             log.debug(f"No change in Parameter: {parameter} with: {values} in lib: {lib_name} Domain: {dom_cfg['name']} (standard value)")
                                                          
-                
+    resp = client.list_components()
+    existing_component = [p["name"] for p in resp]
+
+    for app_cfg in cfg.get('apps', []):
+        name = app_cfg.get("name")
+
+        if name in existing_component:
+            log.info(f"Component {name} already exists. load")
+            app = client.get_component(name)
+        else:
+            log.info(f"Create App: {name}")     
+            platform = app_cfg['platform']
+            platform_path = ( workspace_root / platform / "export" / platform / f"{platform}.xpfm")
+            domain  = app_cfg['domain']
+    
+               
+            kwargs = {
+                "name": name,
+                "platform": str(platform_path),
+                "domain": app_cfg["domain"],
+            }
+
+            if "template" in app_cfg:
+                kwargs["template"] = app_cfg["template"]
+                log.info(f"Using template: {app_cfg['template']}")     
+
+            app = client.create_app_component(**kwargs)
+
+        imports = app_cfg.get("imports", [])
+        
+        app_src_path = workspace_root / name / "src"
+
+        log.info(f"App Source path: {app_src_path}...")
+
+        for item in imports:
+            source = item.get("src")
+            destination = item.get("dest")
+            log.info(f"Importing {source} to {destination}...")
+            create_link(source, destination, repo_root, app_src_path)
+
+        found_sources = find_source_files(app_src_path, extensions=None)
+
+        app.set_app_config("USER_COMPILE_SOURCES", found_sources)
+
+
+
+
+        if 'linker_config' in app_cfg:
+            log.info(f"Configuring Linker Script for {app_cfg['name']}...")
+            lscript = app.get_ld_script()
+            l_cfg = app_cfg['linker_config']
+
+            # 1. Memory Regions
+            for mem in l_cfg.get('memory_regions', []):
+                if mem['action'] == 'update':
+                    lscript.update_memory_region(mem['name'], mem['base'], mem['size'])
+                elif mem['action'] == 'add':
+                    lscript.add_memory_region(mem['name'], mem['base'], mem['size'])
+
+            # 2. Set Stack & Heap
+            if 'stack_size' in l_cfg:
+                lscript.set_stack_size(l_cfg['stack_size'])
+            if 'heap_size' in l_cfg:
+                lscript.set_heap_size(l_cfg['heap_size'])
+
+            # 3. Sektions-Mappings
+            for sec in l_cfg.get('sections', []):
+                lscript.update_ld_section(sec['section'], sec['region'])
+
+
+            set_app_configs = app_cfg.get('set_app_config', {})
+            for param, value in set_app_configs.items():
+                log.info(f"Set app config: {param} = {value}")
+                app.set_app_config(key=param, values=value)
+
+
     vitis.dispose()
  
     return
+
+
 
 
 
