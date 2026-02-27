@@ -1,3 +1,4 @@
-./config
-./hw
-./src
+/config/*
+/hw/*
+/src/*
+/script/helpers/__pycache__/

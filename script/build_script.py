@@ -278,7 +278,35 @@ def run_build(args):
         app.set_app_config("USER_COMPILE_SOURCES", found_sources)
 
 
-    
+
+
+        if 'linker_config' in app_cfg:
+            log.info(f"Configuring Linker Script for {app_cfg['name']}...")
+            lscript = app.get_ld_script()
+            l_cfg = app_cfg['linker_config']
+
+            # 1. Memory Regions
+            for mem in l_cfg.get('memory_regions', []):
+                if mem['action'] == 'update':
+                    lscript.update_memory_region(mem['name'], mem['base'], mem['size'])
+                elif mem['action'] == 'add':
+                    lscript.add_memory_region(mem['name'], mem['base'], mem['size'])
+
+            # 2. Set Stack & Heap
+            if 'stack_size' in l_cfg:
+                lscript.set_stack_size(l_cfg['stack_size'])
+            if 'heap_size' in l_cfg:
+                lscript.set_heap_size(l_cfg['heap_size'])
+
+            # 3. Sektions-Mappings
+            for sec in l_cfg.get('sections', []):
+                lscript.update_ld_section(sec['section'], sec['region'])
+
+
+            set_app_configs = app_cfg.get('set_app_config', {})
+            for param, value in set_app_configs.items():
+                log.info(f"Set app config: {param} = {value}")
+                app.set_app_config(key=param, values=value)
 
 
     vitis.dispose()
