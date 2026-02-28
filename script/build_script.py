@@ -27,6 +27,9 @@ from helpers.path_utils import create_link, find_source_files
 import logging
 log = logging.getLogger(__name__)
 
+import time
+start_time = time.time()
+
 
 def run_build(args):
     
@@ -332,6 +335,8 @@ def main():
     # start build process    
     log.info("Starting build...")
     run_build(args)
+    duration = time.time() - start_time
+    log.info("Build finished in %.2f seconds", duration)
 
     
 
