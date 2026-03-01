@@ -8,7 +8,7 @@ build_script.py: Build Vitis Workspace from json config with Xilinx Python cli
 __author__ = "Till Zirkelbach"
 __copyright__ = "Copyright 2026"
 __license__ = "MIT"
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __email__ = "core.dump@segfault.eu"
 
 import vitis
@@ -189,7 +189,21 @@ def run_build(args):
                 continue
             #else:       
             log.info("Add domain: %s for cpu: (%s)", dom_name, dom_cfg["cpu"])
-            plat.add_domain(name=dom_name, cpu=dom_cfg["cpu"], os=dom_cfg["os"])
+            # 1. Required Arguments
+            kwargs = {"name": dom_name, "cpu": dom_cfg["cpu"]}
+
+            # 2. Optional Arguments 
+            optional_keys = ["os", "display_name", "support_app", "sd_dir", "dt_overlay", "generate_dtb", "hw_boot_bin"]
+            for key in optional_keys:
+                if key in dom_cfg:
+                     kwargs[key] = dom_cfg[key]
+
+            log.info(f"args for add_domain: {kwargs}")
+            try:
+                plat.add_domain(**kwargs)
+            except Exception as e:
+                log.error("Failed to create domain '%s': %s", dom_name, e)
+                raise
     
   
         for dom_cfg in domains:
