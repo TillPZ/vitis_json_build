@@ -8,7 +8,7 @@ build_script.py: Build Vitis Workspace from json config with Xilinx Python cli
 __author__ = "Till Zirkelbach"
 __copyright__ = "Copyright 2026"
 __license__ = "MIT"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __email__ = "core.dump@segfault.eu"
 
 import vitis
@@ -121,17 +121,43 @@ def run_build(args):
         # todo xsa check
         else:
             log.info(
-                "Creating platform %s (xsa=%s, domain=%s, cpu=%s, os=%s)...",
-                name, xsa_path, first_dom["name"], first_dom["cpu"], first_dom["os"]
-            )
+                "Creating platform %s with file: xsa=%s ...", name, xsa_path )
+
+            # 1. Required Arguments
+            kwargs = {"name": name, "hw_design": str(xsa_path)}
+
+            # 2. optional arguments for first domain
+            if first_dom["name"]:
+                kwargs["domain_name"] = first_dom["name"]
+            if first_dom["os"]:
+                kwargs["os"] = first_dom["os"]
+
+            # 3. Optional Arguments for Platform 
+            optional_keys = ["emu_design", 
+                             "platform_xpfm_path", 
+                             "desc", 
+                             "os", 
+                             "domain_name", 
+                             "no_boot_bsp",
+                             "fsbl_path", 
+                             "fsbl_target",
+                             "pmufw_Elf",
+                             "generate_dtb",
+                             "advanced_options",
+                             "architecture",
+                             "compiler",
+                             "hw_boot_bin"
+                             ]
+            
+                        
+            for key in optional_keys:
+                if key in plat_cfg:
+                     kwargs[key] = plat_cfg[key]
+            
+            log.debug(f"args for create_platform_component: {kwargs}")
+            
             try:
-                plat = client.create_platform_component(
-                    name=name,
-                    hw_design=str(xsa_path),
-                    os=first_dom["os"],
-                    cpu=first_dom["cpu"],
-                    domain_name=first_dom["name"],
-                )
+                plat = client.create_platform_component(**kwargs)
             except Exception as e:
                 log.error("Failed to create platform '%s': %s", name, e)
                 raise             
