@@ -8,7 +8,7 @@ build_script.py: Build Vitis Workspace from json config with Xilinx Python cli
 __author__ = "Till Zirkelbach"
 __copyright__ = "Copyright 2026"
 __license__ = "MIT"
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __email__ = "core.dump@segfault.eu"
 
 import vitis
@@ -290,23 +290,25 @@ def run_build(args):
             log.info(f"Component {name} already exists. load")
             app = client.get_component(name)
         else:
-            log.info(f"Create App: {name}")     
             platform = app_cfg['platform']
             platform_path = ( workspace_root / platform / "export" / platform / f"{platform}.xpfm")
-            domain  = app_cfg['domain']
     
-               
-            kwargs = {
-                "name": name,
-                "platform": str(platform_path),
-                "domain": app_cfg["domain"],
-            }
-
-            if "template" in app_cfg:
-                kwargs["template"] = app_cfg["template"]
-                log.info(f"Using template: {app_cfg['template']}")     
-
-            app = client.create_app_component(**kwargs)
+            # 1. Required Arguments
+            kwargs = {"name": name, "platform": str(platform_path)}
+            # 2. Optional Arguments 
+            optional_keys = ["domain", "template", "cpu", "os"]
+            for key in optional_keys:
+                if key in app_cfg:
+                     kwargs[key] = app_cfg[key]
+             
+            log.info(f"Create App: {name} with Platform Path: {platform_path} ")
+            log.debug(f"Create App with the following arguments: {kwargs}")            
+            try:
+                app = client.create_app_component(**kwargs)
+            except Exception as e:
+                log.error("Failed to create app '%s' (platform: %s): %s",
+                          name, platform_path, e)
+                raise
 
         imports = app_cfg.get("imports", [])
         
