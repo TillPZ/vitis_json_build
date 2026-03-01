@@ -262,6 +262,10 @@ def run_build(args):
                         else:
                             log.debug(f"No change in Parameter: {parameter} with: {values} in lib: {lib_name} Domain: {dom_cfg['name']} (standard value)")
                                                          
+    if args.build:
+        plat.build()   
+   
+
     resp = client.list_components()
     existing_component = [p["name"] for p in resp]
 
@@ -307,8 +311,6 @@ def run_build(args):
         app.set_app_config("USER_COMPILE_SOURCES", found_sources)
 
 
-
-
         if 'linker_config' in app_cfg:
             log.info(f"Configuring Linker Script for {app_cfg['name']}...")
             lscript = app.get_ld_script()
@@ -336,6 +338,9 @@ def run_build(args):
             for param, value in set_app_configs.items():
                 log.info(f"Set app config: {param} = {value}")
                 app.set_app_config(key=param, values=value)
+        
+        if args.build:
+            app.build()
 
 
     vitis.dispose()
