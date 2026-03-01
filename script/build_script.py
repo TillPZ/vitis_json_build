@@ -8,7 +8,7 @@ build_script.py: Build Vitis Workspace from json config with Xilinx Python cli
 __author__ = "Till Zirkelbach"
 __copyright__ = "Copyright 2026"
 __license__ = "MIT"
-__version__ = "1.0.0"
+__version__ = "1.0.3"
 __email__ = "core.dump@segfault.eu"
 
 import vitis
@@ -26,6 +26,9 @@ from helpers.path_utils import create_link, find_source_files
 
 import logging
 log = logging.getLogger(__name__)
+
+import time
+start_time = time.time()
 
 
 def run_build(args):
@@ -118,17 +121,43 @@ def run_build(args):
         # todo xsa check
         else:
             log.info(
-                "Creating platform %s (xsa=%s, domain=%s, cpu=%s, os=%s)...",
-                name, xsa_path, first_dom["name"], first_dom["cpu"], first_dom["os"]
-            )
+                "Creating platform %s with file: xsa=%s ...", name, xsa_path )
+
+            # 1. Required Arguments
+            kwargs = {"name": name, "hw_design": str(xsa_path)}
+
+            # 2. optional arguments for first domain
+            if first_dom["name"]:
+                kwargs["domain_name"] = first_dom["name"]
+            if first_dom["os"]:
+                kwargs["os"] = first_dom["os"]
+
+            # 3. Optional Arguments for Platform 
+            optional_keys = ["emu_design", 
+                             "platform_xpfm_path", 
+                             "desc", 
+                             "os", 
+                             "domain_name", 
+                             "no_boot_bsp",
+                             "fsbl_path", 
+                             "fsbl_target",
+                             "pmufw_Elf",
+                             "generate_dtb",
+                             "advanced_options",
+                             "architecture",
+                             "compiler",
+                             "hw_boot_bin"
+                             ]
+            
+                        
+            for key in optional_keys:
+                if key in plat_cfg:
+                     kwargs[key] = plat_cfg[key]
+            
+            log.debug(f"args for create_platform_component: {kwargs}")
+            
             try:
-                plat = client.create_platform_component(
-                    name=name,
-                    hw_design=str(xsa_path),
-                    os=first_dom["os"],
-                    cpu=first_dom["cpu"],
-                    domain_name=first_dom["name"],
-                )
+                plat = client.create_platform_component(**kwargs)
             except Exception as e:
                 log.error("Failed to create platform '%s': %s", name, e)
                 raise             
@@ -160,7 +189,21 @@ def run_build(args):
                 continue
             #else:       
             log.info("Add domain: %s for cpu: (%s)", dom_name, dom_cfg["cpu"])
-            plat.add_domain(name=dom_name, cpu=dom_cfg["cpu"], os=dom_cfg["os"])
+            # 1. Required Arguments
+            kwargs = {"name": dom_name, "cpu": dom_cfg["cpu"]}
+
+            # 2. Optional Arguments 
+            optional_keys = ["os", "display_name", "support_app", "sd_dir", "dt_overlay", "generate_dtb", "hw_boot_bin"]
+            for key in optional_keys:
+                if key in dom_cfg:
+                     kwargs[key] = dom_cfg[key]
+
+            log.info(f"args for add_domain: {kwargs}")
+            try:
+                plat.add_domain(**kwargs)
+            except Exception as e:
+                log.error("Failed to create domain '%s': %s", dom_name, e)
+                raise
     
   
         for dom_cfg in domains:
@@ -233,6 +276,10 @@ def run_build(args):
                         else:
                             log.debug(f"No change in Parameter: {parameter} with: {values} in lib: {lib_name} Domain: {dom_cfg['name']} (standard value)")
                                                          
+    if args.build:
+        plat.build()   
+   
+
     resp = client.list_components()
     existing_component = [p["name"] for p in resp]
 
@@ -243,23 +290,25 @@ def run_build(args):
             log.info(f"Component {name} already exists. load")
             app = client.get_component(name)
         else:
-            log.info(f"Create App: {name}")     
             platform = app_cfg['platform']
             platform_path = ( workspace_root / platform / "export" / platform / f"{platform}.xpfm")
-            domain  = app_cfg['domain']
     
-               
-            kwargs = {
-                "name": name,
-                "platform": str(platform_path),
-                "domain": app_cfg["domain"],
-            }
-
-            if "template" in app_cfg:
-                kwargs["template"] = app_cfg["template"]
-                log.info(f"Using template: {app_cfg['template']}")     
-
-            app = client.create_app_component(**kwargs)
+            # 1. Required Arguments
+            kwargs = {"name": name, "platform": str(platform_path)}
+            # 2. Optional Arguments 
+            optional_keys = ["domain", "template", "cpu", "os"]
+            for key in optional_keys:
+                if key in app_cfg:
+                     kwargs[key] = app_cfg[key]
+             
+            log.info(f"Create App: {name} with Platform Path: {platform_path} ")
+            log.debug(f"Create App with the following arguments: {kwargs}")            
+            try:
+                app = client.create_app_component(**kwargs)
+            except Exception as e:
+                log.error("Failed to create app '%s' (platform: %s): %s",
+                          name, platform_path, e)
+                raise
 
         imports = app_cfg.get("imports", [])
         
@@ -276,8 +325,6 @@ def run_build(args):
         found_sources = find_source_files(app_src_path, extensions=None)
 
         app.set_app_config("USER_COMPILE_SOURCES", found_sources)
-
-
 
 
         if 'linker_config' in app_cfg:
@@ -307,6 +354,9 @@ def run_build(args):
             for param, value in set_app_configs.items():
                 log.info(f"Set app config: {param} = {value}")
                 app.set_app_config(key=param, values=value)
+        
+        if args.build:
+            app.build()
 
 
     vitis.dispose()
@@ -332,6 +382,8 @@ def main():
     # start build process    
     log.info("Starting build...")
     run_build(args)
+    duration = time.time() - start_time
+    log.info("Build finished in %.2f seconds", duration)
 
     
 

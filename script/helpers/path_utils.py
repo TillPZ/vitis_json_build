@@ -13,6 +13,7 @@ __email__ = "core.dump@segfault.eu"
 
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -55,10 +56,16 @@ def create_link(src: str, dest: str, base_src: Path = None, base_dest: Path = No
     try:
         # target_is_directory 
         is_dir = src_path.is_dir()
-        dest_path.symlink_to(src_path, target_is_directory=is_dir)
-        log.info(f"Linked: {src_path} -> {dest_path}")
+        if is_dir and os.name == 'nt':
+            # Create a Junction if the source path is a directory and os is Win.
+            # Junction work without Admin privileges on most Windows Systems
+            subprocess.check_call(f'mklink /j "{dest_path}" "{src_path}"', shell=True)
+        else:
+            # Standard Symlink for the rest
+            dest_path.symlink_to(src_path, target_is_directory=is_dir)
+            log.info(f"Linked: {src_path} -> {dest_path}")
     except OSError as e:
-        log.error(f"ehler beim Erstellen des Link: {e}")
+        log.error(f"Link creation failed: {e}")
 
 
 
